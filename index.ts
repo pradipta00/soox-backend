@@ -1,3 +1,7 @@
 let a:number = 2;
 
-let k:string = 'edii'
+let k:string = 'aoe'
+
+interface myObj{
+    e : (_:null) => void
+}
