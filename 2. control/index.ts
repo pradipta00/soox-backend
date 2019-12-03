@@ -18,8 +18,8 @@ interface auth {
 }
 
 interface user {
-    read : ( _:{ query:{ table:string, id:number } }, __:res ) => void,
-    create : ( _:{ body:{ Username:string, Password:string, Email:string, Fullname:string, userId:number, files:string, type:string, table:string } }, __:res ) => void,
+    // read : ( _:{ query:{ table:string, id:number } }, __:res ) => void,
+    // create : ( _:{ body:{ Username:string, Password:string, Email:string, Fullname:string, userId:number, files:string, type:string, table:string } }, __:res ) => void,
     update : ( _:{ body:{ id:number, table:string, type:string, userId:number } }, __:res ) => void,
     delete : ( _:{ query: { id:number, table:string } }, __:res ) => void
 }
@@ -79,4 +79,116 @@ const auth:auth =
                 })
             })
         },
+    }
+
+    const user:user =
+    {
+        // read : ( req, res ) => {
+        //     let { table, id='userId' } = req.query, query;
+
+        //     switch (table) {
+        //         case 'users':
+        //             query = 'SELECT * FROM users'
+        //             break;
+        //         case 'transaction':
+        //             query = 'SELECT * FROM transaction'
+        //             break;
+        //         case 'limit':
+        //             query = `SELECT count(*) as total FROM views WHERE userId = ${id} GROUP BY DATE(date) ORDER BY date DESC LIMIT 1`
+        //             break;
+        //         case 'transactionCount':
+        //             query = `SELECT count(*) as Transaction, month(date) as Month FROM transaction GROUP BY month(date) ORDER BY Month`
+        //             break;
+        //         case 'usersCount':
+        //             query = `SELECT count(*) as Total, Roles FROM users GROUP BY roles`
+        //             break;
+        //         case 'dailyViews':
+        //             query = `SELECT count(*) AS Total, day(date) as Date FROM views WHERE month(date) = ${new Date().getMonth() + 1} GROUP BY day(date) ORDER BY Date`
+        //             break;
+        //         case 'monthlyViews':
+        //             query = 'SELECT count(*) AS Total, month(date) as Month FROM views GROUP BY month(date) ORDER BY month'
+        //             break;
+        //         default: break;
+        //     }
+
+        //     if (query) 
+        //         db.query( query, (err, response) => {
+        //             if (err) console.error(err);
+        //             res.send(response)
+        //         })
+        //     else
+        //         res.send({ error: true, message: "Table is unrecognized/forbidden" })
+        // },
+        // create : ( req, res ) => {
+        //     let { Username, Password, Email, Fullname, userId, files, type, table } = req.body, sendMessage:{} ;
+        //     switch (table) {
+        //         case 'transaction':
+        //             db.query( `INSERT INTO transaction VALUES (null, ${userId}, '${files}', '${type}', '${moment().format("YYYY-MM-DD HH:mm:ss")}', 0)`,
+        //                 (err, _:never) => {
+        //                     if (err) throw err
+        //                     else 
+        //                         db.query( `UPDATE users SET roles = 'pending' WHERE id = ${userId}`, (err, response) => {
+        //                             if (err) throw err
+        //                             else sendMessage = response[0]
+        //                         })
+        //                 })
+        //             break;
+        //         case 'users':
+        //             // Check for existing users
+        //             db.query( `SELECT * FROM users WHERE username = ${Username} OR email = ${Email}`, ( err, exist ) => {
+        //                 if (err) 
+        //                     throw err
+        //                 else if ( exist.length && exist[0].username === Username ) 
+        //                     sendMessage = { success : false, error: 'username' }
+        //                 else if ( exist.length && exist[0].email === Email ) 
+        //                     sendMessage = { success : false, error : 'email' }
+        //                 else
+        //                     db.query( `INSERT INTO users VALUES ( null, '${Username}', '${createHash(Password)}', '${Email}', '${Fullname}' , 'rakyat', 0)`, 
+        //                         (err, _:never) => {
+        //                             if (err) throw err
+        //                             else sendMessage = { success : true }
+        //                         })
+        //             })
+        //             break;
+        //         default: break;
+        //     }
+        //     res.send(sendMessage)
+        // },
+        update : async ( { body }, res ) => {
+            let { id, table, type, userId } = body, error:MysqlError[];
+
+            switch (table) {
+                case 'transaction':
+                    await db.query(`UPDATE users SET roles = "pejabat", premiumend = "${moment().add(1, type==='month' ? 'M' : 'y').format('YYYY-MM-DD HH:mm:ss')}" WHERE id = ${userId}`,
+                        (err, _:never) => {
+                            if (err) error.push(err)
+                        })
+                    await db.query(`UPDATE transaction SET approved = 1 WHERE id = ${id}`, 
+                        (err, _:never) => {
+                            if (err) error.push(err)
+                        })
+                    break;
+                case 'premiumend':
+                    db.query( `UPDATE users SET roles = 'rakyat' WHERE id = ${id}`, (err, _:never) => {
+                        if (err) error.push(err)
+                    })
+                default:
+                    return res.send({ error : true, message:'Table is unrecognized' })
+            }
+
+            if (error.length) res.send({ error : true, message : error })
+            else res.send({ error: false, message : 'Operation succeed' })
+        },
+        delete : ( req, res ) => {
+            let { id, table } = req.query, query:string;
+
+            if ( table === `users` ) query = `DELETE FROM users WHERE id = ${id}`
+            else if ( table === 'transaction' ) query = `DELETE FROM transaction WHERE id = ${id}`
+            else return res.send({ error : true, message : 'Table unrecognized' })
+
+            db.query( query, (err, response) => {
+                if ( err ) throw err;
+                res.send( response )
+            })
+        }
     }
