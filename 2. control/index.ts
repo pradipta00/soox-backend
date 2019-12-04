@@ -81,7 +81,7 @@ const auth:auth =
         },
     }
 
-    const user:user =
+const user:user =
     {
         // read : ( req, res ) => {
         //     let { table, id='userId' } = req.query, query;
@@ -190,5 +190,76 @@ const auth:auth =
                 if ( err ) throw err;
                 res.send( response )
             })
+        }
+    }
+
+const data:data =
+    {
+        read : ( req, res ) => {
+            let { id = '', table, albumId } = req.query,
+                sendResponse = ( err:MysqlError, response:any ) => { if (err) {throw err} else res.send(response) }
+
+            switch (table) {
+                case 'music':
+                case 'artist':
+                case 'album':
+                case 'genre':
+                    db.query( `SELECT * FROM ${table} WHERE id = ${id}`, sendResponse)
+                    break;        
+                case 'conn_music_genre':
+                    db.query( `SELECT C.*, music.title, genre.name FROM music, genre, conn_music_genre as C WHERE C.genreId = genre.id AND C.musicId = music.id`, sendResponse)
+                    break;
+                case 'conn_music_artist':
+                    db.query( `SELECT C.*, music.title, artist.name FROM music, artist, conn_music_artist as C WHERE C.artistId = artist.id AND C.musicId = music.id`, sendResponse)
+                    break;
+    
+                case 'music_album':
+                    db.query( 'SELECT music.*, album.name AS Album FROM music, album WHERE music.albumId = album.id', sendResponse)
+                    break;
+                case 'latest_album_thumbnail':
+                    db.query( 'SELECT album.*, music.thumbnail FROM album, music WHERE music.albumId = album.id GROUP BY album.id ORDER BY id DESC LIMIT 10', sendResponse)
+                    break;
+                case 'random_album_thumbnail':
+                    db.query( 'SELECT album.*, music.thumbnail FROM album, music WHERE music.albumId = album.id GROUP BY album.id ORDER BY RAND() LIMIT 10', sendResponse)
+                    break;
+                case 'most_album_thumbnail':
+                    db.query( 'SELECT count(*) as total, music.thumbnail, album.* FROM views, music, album WHERE music.id = views.musicId AND album.id = music.albumId GROUP BY albumId ORDER BY total DESC LIMIT 10', sendResponse)
+                    break;
+    
+                case 'music_artist':
+                    db.query( `SELECT music.*, artist.name AS artist_name FROM music, artist, conn_music_artist AS C WHERE music.id = c.musicId AND artist.id = c.artistId ${albumId ? 'AND albumId = ' + albumId : ''} GROUP BY music.id`, sendResponse)
+                    break;
+                case 'latest_music_artist':
+                    db.query( 'SELECT music.*, artist.name AS artist_name FROM music, artist, conn_music_artist AS C WHERE music.id = c.musicId AND artist.id = c.artistId GROUP BY music.id ORDER BY id DESC LIMIT 10', sendResponse)
+                    break;
+                case 'most_music_artist':
+                    db.query( 'SELECT count(*) as total, music.*, artist.name AS artist_name FROM views, music, artist, conn_music_artist as C WHERE music.id = views.musicId AND music.id = C.musicId AND artist.id = C.artistId GROUP BY views.musicId ORDER BY total DESC LIMIT 10', sendResponse)
+                    break;
+                case 'least_music_artist':
+                    db.query( `SELECT music.*, artist.name AS artist_name FROM music, artist, conn_music_artist AS C WHERE music.id NOT IN (SELECT musicId FROM views) AND music.id = C.musicId AND artist.id = C.artistId GROUP BY music.id UNION ALL
+                    (SELECT music.*, artist.name as artist_name FROM views, music, artist, conn_music_artist as C WHERE music.id = views.musicId AND music.id = C.musicId AND artist.id = C.artistId GROUP BY views.musicId ORDER BY count(*) ASC LIMIT 10) LIMIT 10`, sendResponse)
+                    break;
+                case 'most_music_artist_today':
+                    db.query( `SELECT count(*) as total, music.*, artist.name AS artist_name FROM views, music, artist, conn_music_artist as C WHERE date BETWEEN '${moment(new Date()).format('YYYY-MM-DD 00:00:00')}' AND '${moment(new Date()).format('YYYY-MM-DD 23:59:59')}' AND music.id = views.musicId AND music.id = C.musicId AND artist.id = C.artistId GROUP BY views.musicId ORDER BY total DESC LIMIT 10`, sendResponse)
+                    break;
+                case 'most_music_artist_month':
+                    db.query( `SELECT count(*) as total, music.*, artist.name AS artist_name FROM views, music, artist, conn_music_artist as C WHERE date BETWEEN '${moment(new Date()).format('YYYY-MM-00 00:00:00')}' AND '${moment(new Date()).format('YYYY-MM-30 23:59:59')}' AND music.id = views.musicId AND music.id = C.musicId AND artist.id = C.artistId GROUP BY views.musicId ORDER BY total DESC LIMIT 10`, sendResponse)
+                    break;
+                case 'music_artist_user':
+                    db.query( `SELECT music.*, artist.name AS artist_name FROM music, artist, conn_music_artist AS C WHERE music.id = c.musicId AND artist.id = c.artistId AND music.id IN (SELECT musicId FROM views WHERE userId = ${id} GROUP BY musicId ORDER BY date DESC) GROUP BY music.id LIMIT 10`, sendResponse)
+                    break;
+    
+                case 'music_genre':
+                    db.query( `SELECT music.*, artist.name AS artist_name from music, genre, conn_music_genre as C, conn_music_artist as CC, artist WHERE music.id = C.musicId AND genre.id = C.genreId AND CC.musicId = music.id AND artist.id = CC.artistId AND genre.id = ${id} GROUP BY music.id`, sendResponse)
+                    break;
+                case 'most_music_genre':
+                    db.query( 'SELECT count(*) as total, genre.* FROM music, views, genre, conn_music_genre as C WHERE music.id = views.musicId AND music.id = C.musicId AND genre.id = C.genreId GROUP BY genre.id', sendResponse)
+                    break;
+    
+                default:
+                    res.status(403);
+                    res.send(`Forbidden. ${table} is not allowed.`)
+                    break;
+            }
         }
     }
