@@ -263,3 +263,5 @@ const data:data =
             }
         }
     }
+
+export { auth, user, data }
