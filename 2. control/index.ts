@@ -1,6 +1,7 @@
 import db from '../1. database'
 import jwt from 'jsonwebtoken'
 import moment from 'moment'
+import fs from 'fs'
 import crypto from 'crypto'
 import { MysqlError } from 'mysql'
 
@@ -18,14 +19,17 @@ interface auth {
 }
 
 interface user {
-    // read : ( _:{ query:{ table:string, id:number } }, __:res ) => void,
-    // create : ( _:{ body:{ Username:string, Password:string, Email:string, Fullname:string, userId:number, files:string, type:string, table:string } }, __:res ) => void,
+    read : ( _:{ query:{ table:string, id:number } }, __:res ) => void,
+    create : ( _:{ body:{ Username:string, Password:string, Email:string, Fullname:string, userId:number, files:string, type:string, table:string } }, __:res ) => void,
     update : ( _:{ body:{ id:number, table:string, type:string, userId:number } }, __:res ) => void,
     delete : ( _:{ query: { id:number, table:string } }, __:res ) => void
 }
 
 interface data {
-    read : (_:{ query:{ id:number, table:string, albumId:number } }, __:res ) => void
+    read : (_:{ query:{ id:number, table:string, albumId:number } }, __:res ) => void,
+    create : ( _:{ body : { title:string, filename:string, thumbnail:string, albumId:number, musicId:number, artistId:number, genreId:number, userId:number, date:any, table:string, value:string } }, __:res ) => void,
+    delete : ( _:{ query:{ id:number, table:string, filename:string, thumbnail:string, music:string } }, __:res ) => void
+    update : ( _:{ body:{ table:string, filename:string, thumbnail:string, title:string, albumId:string, id:string } } , __:res ) => void
 }
 
 const auth:auth = 
@@ -83,77 +87,77 @@ const auth:auth =
 
 const user:user =
     {
-        // read : ( req, res ) => {
-        //     let { table, id='userId' } = req.query, query;
+        read : ( req, res ) => {
+            let { table, id='userId' } = req.query, query;
 
-        //     switch (table) {
-        //         case 'users':
-        //             query = 'SELECT * FROM users'
-        //             break;
-        //         case 'transaction':
-        //             query = 'SELECT * FROM transaction'
-        //             break;
-        //         case 'limit':
-        //             query = `SELECT count(*) as total FROM views WHERE userId = ${id} GROUP BY DATE(date) ORDER BY date DESC LIMIT 1`
-        //             break;
-        //         case 'transactionCount':
-        //             query = `SELECT count(*) as Transaction, month(date) as Month FROM transaction GROUP BY month(date) ORDER BY Month`
-        //             break;
-        //         case 'usersCount':
-        //             query = `SELECT count(*) as Total, Roles FROM users GROUP BY roles`
-        //             break;
-        //         case 'dailyViews':
-        //             query = `SELECT count(*) AS Total, day(date) as Date FROM views WHERE month(date) = ${new Date().getMonth() + 1} GROUP BY day(date) ORDER BY Date`
-        //             break;
-        //         case 'monthlyViews':
-        //             query = 'SELECT count(*) AS Total, month(date) as Month FROM views GROUP BY month(date) ORDER BY month'
-        //             break;
-        //         default: break;
-        //     }
+            switch (table) {
+                case 'users':
+                    query = 'SELECT * FROM users'
+                    break;
+                case 'transaction':
+                    query = 'SELECT * FROM transaction'
+                    break;
+                case 'limit':
+                    query = `SELECT count(*) as total FROM views WHERE userId = ${id} GROUP BY DATE(date) ORDER BY date DESC LIMIT 1`
+                    break;
+                case 'transactionCount':
+                    query = `SELECT count(*) as Transaction, month(date) as Month FROM transaction GROUP BY month(date) ORDER BY Month`
+                    break;
+                case 'usersCount':
+                    query = `SELECT count(*) as Total, Roles FROM users GROUP BY roles`
+                    break;
+                case 'dailyViews':
+                    query = `SELECT count(*) AS Total, day(date) as Date FROM views WHERE month(date) = ${new Date().getMonth() + 1} GROUP BY day(date) ORDER BY Date`
+                    break;
+                case 'monthlyViews':
+                    query = 'SELECT count(*) AS Total, month(date) as Month FROM views GROUP BY month(date) ORDER BY month'
+                    break;
+                default: break;
+            }
 
-        //     if (query) 
-        //         db.query( query, (err, response) => {
-        //             if (err) console.error(err);
-        //             res.send(response)
-        //         })
-        //     else
-        //         res.send({ error: true, message: "Table is unrecognized/forbidden" })
-        // },
-        // create : ( req, res ) => {
-        //     let { Username, Password, Email, Fullname, userId, files, type, table } = req.body, sendMessage:{} ;
-        //     switch (table) {
-        //         case 'transaction':
-        //             db.query( `INSERT INTO transaction VALUES (null, ${userId}, '${files}', '${type}', '${moment().format("YYYY-MM-DD HH:mm:ss")}', 0)`,
-        //                 (err, _:never) => {
-        //                     if (err) throw err
-        //                     else 
-        //                         db.query( `UPDATE users SET roles = 'pending' WHERE id = ${userId}`, (err, response) => {
-        //                             if (err) throw err
-        //                             else sendMessage = response[0]
-        //                         })
-        //                 })
-        //             break;
-        //         case 'users':
-        //             // Check for existing users
-        //             db.query( `SELECT * FROM users WHERE username = ${Username} OR email = ${Email}`, ( err, exist ) => {
-        //                 if (err) 
-        //                     throw err
-        //                 else if ( exist.length && exist[0].username === Username ) 
-        //                     sendMessage = { success : false, error: 'username' }
-        //                 else if ( exist.length && exist[0].email === Email ) 
-        //                     sendMessage = { success : false, error : 'email' }
-        //                 else
-        //                     db.query( `INSERT INTO users VALUES ( null, '${Username}', '${createHash(Password)}', '${Email}', '${Fullname}' , 'rakyat', 0)`, 
-        //                         (err, _:never) => {
-        //                             if (err) throw err
-        //                             else sendMessage = { success : true }
-        //                         })
-        //             })
-        //             break;
-        //         default: break;
-        //     }
-        //     res.send(sendMessage)
-        // },
+            if (query) 
+                db.query( query, (err, response) => {
+                    if (err) console.error(err);
+                    res.send(response)
+                })
+            else
+                res.send({ error: true, message: "Table is unrecognized/forbidden" })
+        },
+        create : ( req, res ) => {
+            let { Username, Password, Email, Fullname, userId, files, type, table } = req.body, sendMessage:{} ;
+            switch (table) {
+                case 'transaction':
+                    db.query( `INSERT INTO transaction VALUES (null, ${userId}, '${files}', '${type}', '${moment().format("YYYY-MM-DD HH:mm:ss")}', 0)`,
+                        (err, _:never) => {
+                            if (err) throw err
+                            else 
+                                db.query( `UPDATE users SET roles = 'pending' WHERE id = ${userId}`, (err, response) => {
+                                    if (err) throw err
+                                    else sendMessage = response[0]
+                                })
+                        })
+                    break;
+                case 'users':
+                    // Check for existing users
+                    db.query( `SELECT * FROM users WHERE username = ${Username} OR email = ${Email}`, ( err, exist ) => {
+                        if (err) 
+                            throw err
+                        else if ( exist.length && exist[0].username === Username ) 
+                            sendMessage = { success : false, error: 'username' }
+                        else if ( exist.length && exist[0].email === Email ) 
+                            sendMessage = { success : false, error : 'email' }
+                        else
+                            db.query( `INSERT INTO users VALUES ( null, '${Username}', '${createHash(Password)}', '${Email}', '${Fullname}' , 'rakyat', 0)`, 
+                                (err, _:never) => {
+                                    if (err) throw err
+                                    else sendMessage = { success : true }
+                                })
+                    })
+                    break;
+                default: break;
+            }
+            res.send(sendMessage)
+        },
         update : async ( { body }, res ) => {
             let { id, table, type, userId } = body, error:MysqlError[];
 
@@ -261,6 +265,108 @@ const data:data =
                     res.send(`Forbidden. ${table} is not allowed.`)
                     break;
             }
+        },
+
+        create : ( {body}, res ) => {
+            let { title, filename, thumbnail, albumId, musicId, artistId, genreId, userId, date, table, value } = body,
+                query:string,
+                response = ( err:MysqlError, response:any ) => { if (err) throw err; res.send(response) };
+
+            switch (table) {
+                case 'album':
+                case 'artist':
+                case 'genre':
+                    query =`INSERT INTO ${table} VALUES (null, "${value}")`;
+                    break;
+                case 'music':
+                    query = `INSERT INTO music VALUES (null , "${title}", "${filename}", "${thumbnail}", "${albumId}")`
+                    response = ( err, success ) => {
+                        if (err) {res.send({ ...err, ok : false }); console.trace(err)}
+                        else res.send({...success, ok : true})
+                    }
+                    break;
+                case 'conn_music_artist':
+                    query = `INSERT INTO conn_music_artist VALUES (${musicId}, ${artistId})`
+                    break;
+                case 'conn_music_genre':
+                    query = `INSERT INTO conn_music_genre VALUES (${musicId}, ${genreId})`
+                    break;
+                case 'views' : 
+                    query = `INSERT INTO views VALUES ( ${musicId}, ${userId}, '${date}' )`
+                    break;
+                default:
+                    response = _ => { res.status(403);res.send('Forbidden. The table you intend to modify is forbidden.') }
+                    break;
+            }
+
+            db.query(query, response)
+        },
+
+        delete : ( req, res ) => {
+            let { id, table, filename, thumbnail, music } = req.query,
+                query:string[],
+                error:MysqlError[],
+                result:any[]
+            
+            switch (table) {
+                case 'Artist':
+                    query.push(`DELETE FROM conn_music_artist WHERE artistId = ${id}`)
+                    query.push(`DELETE FROM artist WHERE id = ${id}`)
+                    break;
+                case 'Genre' :
+                    query.push(`DELETE FROM conn_music_genre WHERE genreId = ${id}`)
+                    query.push(`DELETE FROM genre WHERE id = ${id}`)
+                    break;
+                case 'Album' :
+                    query.push(`UPDATE music SET albumId = -1 WHERE albumId = ${id}`)
+                    query.push(`DELETE FROM album WHERE id = ${id}`)
+                    break;
+                case 'conn_music_artist':
+                    query.push(`DELETE FROM conn_music_artist WHERE musicId = ${id[0]} AND artistId = ${id[1]}`)
+                    break;
+                case 'conn_music_genre':
+                    query.push(`DELETE FROM conn_music_genre WHERE musicId = ${id[0]} AND genreId = ${id[1]}`)
+                    break;
+                case 'music':
+                    query.push(`DELETE FROM conn_music_artist WHERE musicId = ${id}`)
+                    query.push(`DELETE FROM conn_music_genre WHERE musicId = ${id}`)
+                    query.push(`DELETE FROM music WHERE id = ${id}`)
+                    fs.unlinkSync(`thumbnails/${thumbnail}`)
+                    fs.unlinkSync(`music/${music}`)
+                    break;
+                case 'file':
+                    if (thumbnail) fs.unlinkSync(`thumbnails/${thumbnail}`);
+                    if (filename) fs.unlinkSync(`music/${filename}`);
+                    res.send({ ok : true });
+                    return null;
+                default: break;
+            }
+
+            if ( query.length ){
+                query.forEach(async item => {
+                    await db.query( item, (err:MysqlError, response:any) => { if (err) error.push(error); result.push(response) } )
+                })
+                if ( !error.length ) res.send({ ok: true, ...result })
+                else res.send({ ok: false, ...error })
+            }
+            else {
+                res.send({ ok: false,  })
+            }
+        },
+
+        update : ( {body}, res ) => {
+            let { table, filename, thumbnail, title, albumId, id  } = body,
+                query:string
+
+            switch (table) {
+                case 'music':
+                        query = `UPDATE ${table} SET title = "${title || 'title'}", albumId = ${albumId || 'albumId'}, filename = "${filename || 'filename'}", thumbnail = "${thumbnail || 'thumbnail'}" WHERE id = ${id}`
+                    break;
+                default:
+                    break;
+            }
+
+            res.send(query)
         }
     }
 
