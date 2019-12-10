@@ -28,7 +28,7 @@ interface user {
 interface data {
     read : (_:{ query:{ id:number, table:string, albumId:number } }, __:res ) => void,
     create : ( _:{ body : { title:string, filename:string, thumbnail:string, albumId:number, musicId:number, artistId:number, genreId:number, userId:number, date:any, table:string, value:string } }, __:res ) => void,
-    delete : ( _:{ query:{ id:number, table:string, filename:string, thumbnail:string, music:string } }, __:res ) => void
+    delete : ( _:{ query:{ id:any, table:string, filename:string, thumbnail:string, music:string } }, __:res ) => void
     update : ( _:{ body:{ table:string, filename:string, thumbnail:string, title:string, albumId:string, id:string } } , __:res ) => void
 }
 
@@ -38,9 +38,9 @@ const auth:auth =
             let username = body.Username || '',
                 password = body.Password || '',
                 hashed:string = createHash(password),
-                query:string = `SELECT * FROM users WHERE username = ${username}`
+                query:string = `SELECT * FROM users WHERE username = '${username}'`
 
-            if ( username.match( /[@]{1}[\w\d]+[\.]/g ) ) query = `SELECT * FROM users WHERE email = ${username}`
+            if ( username.match( /[@]{1}[\w\d]+[\.]/g ) ) query = `SELECT * FROM users WHERE email = '${username}'`
 
             db.query( query, (err:{}, response:[{ password:string }]) => {
 
@@ -124,7 +124,7 @@ const user:user =
                 res.send({ error: true, message: "Table is unrecognized/forbidden" })
         },
         create : ( req, res ) => {
-            let { Username, Password, Email, Fullname, userId, files, type, table } = req.body, sendMessage:{} ;
+            let { Username, Password, Email, Fullname, userId, files, type, table } = req.body;
             switch (table) {
                 case 'transaction':
                     db.query( `INSERT INTO transaction VALUES (null, ${userId}, '${files}', '${type}', '${moment().format("YYYY-MM-DD HH:mm:ss")}', 0)`,
@@ -133,30 +133,30 @@ const user:user =
                             else 
                                 db.query( `UPDATE users SET roles = 'pending' WHERE id = ${userId}`, (err, response) => {
                                     if (err) throw err
-                                    else sendMessage = response[0]
+                                    else res.send(response[0])
                                 })
                         })
                     break;
                 case 'users':
                     // Check for existing users
-                    db.query( `SELECT * FROM users WHERE username = ${Username} OR email = ${Email}`, ( err, exist ) => {
+                    db.query( `SELECT * FROM users WHERE username = '${Username}' OR email = '${Email}'`, ( err, exist ) => {
                         if (err) 
                             throw err
                         else if ( exist.length && exist[0].username === Username ) 
-                            sendMessage = { success : false, error: 'username' }
+                            res.send({ success : false, error: 'username' })
                         else if ( exist.length && exist[0].email === Email ) 
-                            sendMessage = { success : false, error : 'email' }
+                            res.send({ success : false, error : 'email' })
                         else
                             db.query( `INSERT INTO users VALUES ( null, '${Username}', '${createHash(Password)}', '${Email}', '${Fullname}' , 'rakyat', 0)`, 
                                 (err, _:never) => {
+                                    console.log('added')
                                     if (err) throw err
-                                    else sendMessage = { success : true }
+                                    else res.send({ success : true })
                                 })
                     })
                     break;
                 default: break;
             }
-            res.send(sendMessage)
         },
         update : async ( { body }, res ) => {
             let { id, table, type, userId } = body, error:MysqlError[];
@@ -200,7 +200,7 @@ const user:user =
 const data:data =
     {
         read : ( req, res ) => {
-            let { id = '', table, albumId } = req.query,
+            let { id, table, albumId } = req.query,
                 sendResponse = ( err:MysqlError, response:any ) => { if (err) {throw err} else res.send(response) }
 
             switch (table) {
@@ -305,7 +305,7 @@ const data:data =
         delete : ( req, res ) => {
             let { id, table, filename, thumbnail, music } = req.query,
                 query:string[],
-                error:MysqlError[],
+                error:Array<MysqlError>,
                 result:any[]
             
             switch (table) {
@@ -344,7 +344,7 @@ const data:data =
 
             if ( query.length ){
                 query.forEach(async item => {
-                    await db.query( item, (err:MysqlError, response:any) => { if (err) error.push(error); result.push(response) } )
+                    await db.query( item, (err:MysqlError, response:any) => { if (err) error.push(err); result.push(response) } )
                 })
                 if ( !error.length ) res.send({ ok: true, ...result })
                 else res.send({ ok: false, ...error })
